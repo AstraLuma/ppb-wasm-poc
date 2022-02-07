@@ -1,9 +1,15 @@
 const NEWLINE = 10; // ASCII/UTF-8 newline
 
 class StdinStream {
-    constructor(text) {
-        const in_buffer = (new TextEncoder()).encode(text);
+    constructor() {
+        const in_buffer = (new TextEncoder()).encode("");
         this.in_stream = in_buffer.values();
+
+        fetch("/wasmpy/wasm_main.py")
+        .then((resp) => resp.arrayBuffer())
+        .then((buffer) => {
+            this.in_stream = (new Uint8Array(buffer)).values();
+        });
     }
 
     get = () => {
@@ -68,7 +74,7 @@ onmessage = (event) => {
     if (event.data.type === 'run') {
         // TODO: Set up files from event.data.files
         // https://emscripten.org/docs/api_reference/Filesystem-API.html
-        const ret = callMain(['-v'] /*event.data.args*/)
+        const ret = callMain([/*'-v'*/] /*event.data.args*/)
         postMessage({
             type: 'exit',
             returnCode: ret

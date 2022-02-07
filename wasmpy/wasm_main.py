@@ -12,5 +12,10 @@ sys.stdout = sys.stderr
 outstream.write("$READY$\n")
 outstream.flush()
 
-for msg in instream:
-    outstream.write(msg)
+while True:
+    for msg in instream:
+        print(msg)
+        outstream.write(msg)
+
+outstream.write("$READY$\n")
+outstream.flush()

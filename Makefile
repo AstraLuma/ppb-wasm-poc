@@ -8,7 +8,7 @@ python.js python.wasm:
 	wget https://ethanhs.github.io/python-wasm/$(notdir $@) -O $@
 
 # FIXME: Recursion
-python.data: lib/*
+python.data:  # wasmpy/*
 	wget https://ethanhs.github.io/python-wasm/$(notdir $@) -O $@
 # FIXME: This breaks the bundle in strange ways.
 # 	zip $@ $^
