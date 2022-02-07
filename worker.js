@@ -1,79 +1,54 @@
-class StdinBuffer {
-    constructor() {
-        /*
-        this.sab = new SharedArrayBuffer(128 * Int32Array.BYTES_PER_ELEMENT)
-        this.buffer = new Int32Array(this.sab)
-        this.readIndex = 1;
-        this.numberOfCharacters = 0;
-        this.sentNull = true
-        */
-        this.buffer = (new TextEncoder()).encode("print('hello')");
-        this.stream = this.buffer.values();
+const NEWLINE = 10; // ASCII/UTF-8 newline
+
+class StdinStream {
+    constructor(text) {
+        const in_buffer = (new TextEncoder()).encode(text);
+        this.in_stream = in_buffer.values();
     }
 
-    prompt() {
-        console.log("worker: prompt");
-        /*
-        this.readIndex = 1
-        Atomics.store(this.buffer, 0, -1)
-        postMessage({
-            type: 'stdin',
-            buffer: this.sab
-        })
-        Atomics.wait(this.buffer, 0, -1)
-        this.numberOfCharacters = this.buffer[0]
-        */
-    }
-
-    stdin = () => {
-        const { value, done } = this.stream.next();
+    get = () => {
+        const { value, done } = this.in_stream.next();
         if (done) {
-            console.log("worker: stdin: done");
+//            console.log("worker: stdin: done");
             return null;
         } else {
-            console.log("worker: stdin:", value);
+//            console.log("worker: stdin:", value);
             return value;
         }
-        /*
-        if (this.numberOfCharacters + 1 === this.readIndex) {
-            if (!this.sentNull) {
-                // Must return null once to indicate we're done for now.
-                this.sentNull = true
-                return null
-            }
-            this.sentNull = false
-            this.prompt()
-        }
-        const char = this.buffer[this.readIndex]
-        this.readIndex += 1
-        // How do I send an EOF??
-        return char
-        */
     }
 }
 
-const stdoutBufSize = 128;
-const stdoutBuf = new Int32Array()
-let index = 0;
-
-const stdout = (charCode) => {
-    console.log("stdout", typeof charCode, charCode);
+class OutBuffer {
+    constructor(on_line) {
+        this.on_line = on_line;
+        this.buffer = [];
+    }
+    feed = (charCode) => {
+//        console.log("stdout", typeof charCode, charCode);
+        this.buffer.push(charCode);
+        var i;
+        while ((i = this.buffer.indexOf(NEWLINE)) != -1) {
+            const raw_line = this.buffer.slice(0, i + 1);
+            this.buffer = this.buffer.slice(i + 1);
+            const line = (new TextDecoder()).decode(Uint8Array.from(raw_line));
+            this.on_line && this.on_line(line);
+        }
+    }
 }
 
-const stderr = (charCode) => {
-    console.log("stderr", typeof charCode, charCode);
-}
+const stdin = new StdinStream("import wasm_main\n")
+const stdout = new OutBuffer((line) => console.log("out", line));
+const stderr = new OutBuffer((line) => console.log("err", line));
 
-const stdinBuffer = new StdinBuffer()
 
 // https://emscripten.org/docs/api_reference/module.html
 var Module = {
     noInitialRun: true,
-    stdin: stdinBuffer.stdin,
-    stdout: stdout,
-    stderr: stderr,
+    stdin: stdin.get,
+    stdout: stdout.feed,
+    stderr: stderr.feed,
     onRuntimeInitialized: () => {
-        postMessage({type: 'ready', stdinBuffer: stdinBuffer.sab})
+        postMessage({type: 'started'})
     }
     // onAbort
 }
@@ -84,11 +59,11 @@ onmessage = (event) => {
         // https://emscripten.org/docs/api_reference/Filesystem-API.html
         const ret = callMain(event.data.args)
         postMessage({
-            type: 'finished',
+            type: 'exit',
             returnCode: ret
         })
     }
 }
 
-console.log("Loading python");
+console.log("Loading CPython");
 importScripts('python.js')
