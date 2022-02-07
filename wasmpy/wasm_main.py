@@ -15,8 +15,9 @@ outstream.flush()
 while True:
     # This breaks when the buffer empties
     for msg in instream:
-        print(msg)
+        print(f"{msg=}")
         outstream.write(msg)
+        outstream.flush()
 
-outstream.write("$READY$\n")
+outstream.write("$EXIT$\n")
 outstream.flush()
