@@ -26,8 +26,9 @@ export class WorkerManager {
 
     handleMessageFromWorker = (event) => {
         const type = event.data.type
-        if (type === 'started') {
-            console.log("CPython starting");
+        if (type === 'inited') {
+            console.log("CPython runtime loaded");
+            this.readyCallBack()
         } else if (type === 'ready') {
             this.readyCallBack()
         } else if (type === 'exit') {

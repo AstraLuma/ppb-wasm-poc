@@ -34,9 +34,15 @@ class OutBuffer {
             this.on_line && this.on_line(line);
         }
     }
+
+    flush() {
+        const line = (new TextDecoder()).decode(Uint8Array.from(this.buffer));
+        this.buffer = [];
+        this.on_line && this.on_line(line);
+    }
 }
 
-const stdin = new StdinStream("import wasm_main\n")
+const stdin = new StdinStream("import lib.wasm_main\n")
 const stdout = new OutBuffer((line) => console.log("out", line));
 const stderr = new OutBuffer((line) => console.log("err", line));
 
@@ -48,16 +54,21 @@ var Module = {
     stdout: stdout.feed,
     stderr: stderr.feed,
     onRuntimeInitialized: () => {
-        postMessage({type: 'started'})
-    }
-    // onAbort
+        console.log("onRuntimeInitialized");
+        postMessage({type: 'inited'})
+    },
+    onAbort: () => {
+        console.log("onAbort");
+        stdout.flush();
+        stderr.flush();
+    },
 }
 
 onmessage = (event) => {
     if (event.data.type === 'run') {
         // TODO: Set up files from event.data.files
         // https://emscripten.org/docs/api_reference/Filesystem-API.html
-        const ret = callMain(event.data.args)
+        const ret = callMain(['-v'] /*event.data.args*/)
         postMessage({
             type: 'exit',
             returnCode: ret

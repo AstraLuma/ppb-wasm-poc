@@ -1,10 +1,14 @@
-.PHONY: all
+.PHONY: all clean
 all: python.js python.wasm python.data
 
+clean:
+	git clean -X -f
+
 python.js python.wasm:
-	wget https://repl.ethanhs.me/worker/$(notdir $@) -O $@
+	wget https://ethanhs.github.io/python-wasm/$(notdir $@) -O $@
 
 # FIXME: Recursion
 python.data: lib/*
-	wget https://repl.ethanhs.me/worker/$(notdir $@) -O $@
-	zip $@ $^
+	wget https://ethanhs.github.io/python-wasm/$(notdir $@) -O $@
+# FIXME: This breaks the bundle in strange ways.
+# 	zip $@ $^
