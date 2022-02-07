@@ -2,19 +2,12 @@ const NEWLINE = 10; // ASCII/UTF-8 newline
 
 class StdinStream {
     constructor() {
-        const in_buffer = (new TextEncoder()).encode("");
-        this.in_stream = in_buffer.values();
-
-        fetch("/wasmpy/wasm_main.py")
-        .then((resp) => resp.arrayBuffer())
-        .then((buffer) => {
-            this.in_stream = (new Uint8Array(buffer)).values();
-        });
+        this.buffer = [];
     }
 
     get = () => {
-        const { value, done } = this.in_stream.next();
-        if (done) {
+        const value = this.buffer.shift();
+        if (value === undefined) {
 //            console.log("worker: stdin: done");
             return null;
         } else {
@@ -22,7 +15,19 @@ class StdinStream {
             return value;
         }
     }
+
+    feed_string(str) {
+        const stream = (new TextEncoder()).encode(str);
+        this.feed_binary(stream);
+    }
+
+    feed_binary(seq) {
+        for (let i of seq) {
+            this.buffer.push(i);
+        }
+    }
 }
+
 
 class OutBuffer {
     constructor(on_line) {
@@ -49,8 +54,22 @@ class OutBuffer {
 }
 
 const stdin = new StdinStream("import lib.wasm_main\n")
-const stdout = new OutBuffer((line) => console.log("out", line));
+const stdout = new OutBuffer((line) => {
+    console.log("out", line);
+    if (line == '$READY$\n') {
+        stdin.feed_string("spam\n");
+        stdin.feed_string("eggs\n");
+    }
+});
 const stderr = new OutBuffer((line) => console.log("err", line));
+
+
+fetch("/wasmpy/wasm_main.py")
+.then((resp) => resp.arrayBuffer())
+.then((buffer) => {
+    stdin.feed_binary(new Int8Array(buffer));
+    stdin.feed_string("\n");
+});
 
 
 // https://emscripten.org/docs/api_reference/module.html

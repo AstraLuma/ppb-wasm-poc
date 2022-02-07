@@ -13,6 +13,7 @@ outstream.write("$READY$\n")
 outstream.flush()
 
 while True:
+    # This breaks when the buffer empties
     for msg in instream:
         print(msg)
         outstream.write(msg)
