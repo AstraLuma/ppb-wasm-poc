@@ -39,7 +39,6 @@ button {
 import { WorkerManager } from "./worker-manager.js";
 
 const replButton = document.getElementById('repl');
-const clearButton = document.getElementById('clear');
 
 console.debug("Secure context", window.isSecureContext);
 console.debug("Correct CORS", window.crossOriginIsolated);
@@ -53,15 +52,12 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     replButton.addEventListener('click', (e) => {
-        // Need to use "-i -" to force interactive mode.
-        // Looks like isatty always returns false in emscripten
         pythonWorkerManager.run({args: [], files: {}})
     })
 
     const readyCallback = () => {
         console.log("Ready");
         replButton.removeAttribute('disabled')
-        clearButton.removeAttribute('disabled')
     }
 
     const pythonWorkerManager = new WorkerManager('worker.js', stdio, readyCallback)
