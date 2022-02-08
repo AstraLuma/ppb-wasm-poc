@@ -12,10 +12,11 @@ sys.stdout = sys.stderr
 outstream.write("$READY$\n")
 outstream.flush()
 
+print("Starting loop", flush=True)
 while True:
     # This breaks when the buffer empties
     for msg in instream:
-        print(f"{msg=}")
+        print(f"{msg=}", flush=True)
         outstream.write(msg)
         outstream.flush()
 

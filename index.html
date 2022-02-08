@@ -44,23 +44,21 @@ console.debug("Secure context", window.isSecureContext);
 console.debug("Correct CORS", window.crossOriginIsolated);
 
 window.addEventListener('DOMContentLoaded', () => {
+    console.log("DOM Loaded");
     const stdio = {
         stdout: (s) => { console.log(s) },
         stderr: (s) => { console.log(s) },
         stdin: async () => {
         }
-    }
-
-    replButton.addEventListener('click', (e) => {
-        pythonWorkerManager.run({args: [], files: {}})
-    })
+    };
 
     const readyCallback = () => {
         console.log("Ready");
-        replButton.removeAttribute('disabled')
-    }
+        pythonWorkerManager.msg("ping", {})
+    };
 
-    const pythonWorkerManager = new WorkerManager('worker.js', stdio, readyCallback)
+    console.log("Starting worker manager");
+    const pythonWorkerManager = new WorkerManager('worker.js', stdio, readyCallback);
 });
     </script>
 </body>

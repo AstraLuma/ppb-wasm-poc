@@ -1,3 +1,5 @@
+console.log("Worker starting");
+
 const NEWLINE = 10; // ASCII/UTF-8 newline
 
 class StdinStream {
@@ -8,10 +10,8 @@ class StdinStream {
     get = () => {
         const value = this.buffer.shift();
         if (value === undefined) {
-//            console.log("worker: stdin: done");
             return null;
         } else {
-//            console.log("worker: stdin:", value);
             return value;
         }
     }
@@ -35,7 +35,6 @@ class OutBuffer {
         this.buffer = [];
     }
     feed = (charCode) => {
-//        console.log("stdout", typeof charCode, charCode);
         this.buffer.push(charCode);
         var i;
         while ((i = this.buffer.indexOf(NEWLINE)) != -1) {
@@ -53,52 +52,124 @@ class OutBuffer {
     }
 }
 
-const stdin = new StdinStream("import lib.wasm_main\n")
-const stdout = new OutBuffer((line) => {
-    console.log("out", line);
-    if (line == '$READY$\n') {
-        stdin.feed_string("spam\n");
-        stdin.feed_string("eggs\n");
+
+/**
+ * Handles stdin/stdout-based comms with Python
+ */
+class CommsHandler {
+    constructor() {
+        this.stdin = new StdinStream();
+        this.stdout = new OutBuffer(this._get_out_data);
+        // True when we think the other end will correctly interpret & send messages
+        this.can_message = false;
+
+        this.get_stdin = this.stdin.get;
+        this.feed_stdout = this.stdout.feed;
     }
+
+    _get_out_data(line) {
+        console.log("out", line);
+        if (line == '$READY$\n') {
+            this.can_message = true;
+            postMessage({$: 'ready'});
+        } else if (line == '$EXIT$\n') {
+            postMessage({$: 'unready'});
+            this.can_message = false;
+        } else if (this.can_message) {
+            // Parse and dispatch message
+            var msg;
+            try {
+                msg = JSON.parse(line);
+            } catch (err) {
+                postMessage({
+                    $: 'bad-msg',
+                    m: line,
+                    e: err,
+                });
+            }
+            if (msg) {
+                postMessage(msg);
+            }
+        } else {
+            postMessage({
+                $: 'log',
+                l: line,
+            });
+        }
+    }
+
+    /// Pass a message from the tab to Python
+    on_message(msg) {
+        if (!this.can_message) {
+            console.error("Unable to deliver message", msg);
+            // ???
+            return
+        }
+        console.log("Proxying message", msg);
+        var line = JSON.stringify(msg);
+        this.stdin.feed_string(line + '\n');
+    }
+
+    /// Feed the interpretor code
+    feed_code(src) {
+        if (this.can_message) {
+            throw Error("Can't feed code when code is running");
+        }
+        this.stdin.feed_string(src);
+        this.stdin.feed_string("\n");
+
+    }
+
+    /// Immediately flush textual buffers
+    flush() {
+        this.stdout.flush();
+    }
+
+    on_exit() {
+        this.stdout.flush();
+        this.can_message = false;
+    }
+}
+
+console.log("IO ~shenanigans~ scaffolding initializing");
+const comms = new CommsHandler();
+const stderr = new OutBuffer((line) => {
+    console.log("err", line);
+    postMessage({
+        $: 'log',
+        l: line,
+    });
 });
-const stderr = new OutBuffer((line) => console.log("err", line));
 
 
 fetch("/wasmpy/wasm_main.py")
-.then((resp) => resp.arrayBuffer())
-.then((buffer) => {
-    stdin.feed_binary(new Int8Array(buffer));
-    stdin.feed_string("\n");
+.then((resp) => resp.text())
+.then((txt) => {
+    console.log("Got Python code");
+    comms.feed_code(txt);
 });
 
 
 // https://emscripten.org/docs/api_reference/module.html
 var Module = {
-    noInitialRun: true,
-    stdin: stdin.get,
-    stdout: stdout.feed,
+    noInitialRun: false,
+    stdin: comms.get_stdin,
+    stdout: comms.feed_stdout,
     stderr: stderr.feed,
     onRuntimeInitialized: () => {
         console.log("onRuntimeInitialized");
-        postMessage({type: 'inited'})
+        postMessage({$: 'inited'});
     },
     onAbort: () => {
         console.log("onAbort");
-        stdout.flush();
         stderr.flush();
+        comms.flush();
+        postMessage({$: 'abort'});
     },
 }
 
 onmessage = (event) => {
-    if (event.data.type === 'run') {
-        // TODO: Set up files from event.data.files
-        // https://emscripten.org/docs/api_reference/Filesystem-API.html
-        const ret = callMain([/*'-v'*/] /*event.data.args*/)
-        postMessage({
-            type: 'exit',
-            returnCode: ret
-        })
-    }
+    comms.on_message(event.data);
 }
 
 console.log("Loading CPython");
