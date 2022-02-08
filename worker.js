@@ -10,8 +10,10 @@ class StdinStream {
     get = () => {
         const value = this.buffer.shift();
         if (value === undefined) {
+            // console.log("stdin:empty");
             return null;
         } else {
+            // console.log("stdin:char", value);
             return value;
         }
     }
@@ -35,6 +37,7 @@ class OutBuffer {
         this.buffer = [];
     }
     feed = (charCode) => {
+        // console.log("buffer", charCode);
         this.buffer.push(charCode);
         var i;
         while ((i = this.buffer.indexOf(NEWLINE)) != -1) {
@@ -101,7 +104,7 @@ class CommsHandler {
     /// Pass a message from the tab to Python
     on_message(msg) {
         if (!this.can_message) {
-            console.error("Unable to deliver message", msg);
+            console.error("Unable to proxy message", msg);
             // ???
             return
         }
@@ -152,7 +155,7 @@ fetch("/wasmpy/wasm_main.py")
 
 // https://emscripten.org/docs/api_reference/module.html
 var Module = {
-    noInitialRun: false,
+    noInitialRun: true,
     stdin: comms.get_stdin,
     stdout: comms.feed_stdout,
     stderr: stderr.feed,
@@ -166,11 +169,20 @@ var Module = {
         comms.flush();
         postMessage({$: 'abort'});
     },
-}
+};
 
 onmessage = (event) => {
-    comms.on_message(event.data);
-}
+    console.log("onmessage", event.data);
+    if (event.data.$ == 'run') {
+        const ret = callMain([/*'-v'*/]);
+        postMessage({
+            type: 'exit',
+            returnCode: ret
+        });        
+    } else {
+        comms.on_message(event.data);
+    }
+};
 
 console.log("Loading CPython");
 importScripts('python.js')

@@ -70,8 +70,3 @@ There was a dramatic error.
     $: 'inited'
 }
 ```
-
-
-run
-===
-(tab->worker) Please start Python

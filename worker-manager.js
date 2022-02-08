@@ -26,6 +26,7 @@ export class WorkerManager {
         const type = event.data.$;
         if (type === 'inited') {
             console.log("CPython runtime loaded");
+            this.msg('run');
         } else if (type === 'ready') {
             this.readyCallBack()
         } else if (type === 'exit') {
@@ -42,7 +43,7 @@ export class WorkerManager {
     msg(kind, args) {
         // TODO: guard rails
         const msg = {$: kind, ...(args || {})};
-        console.log("Sending message", msg)
-        postMessage(msg);
+        console.log("Sending message", this.worker, msg);
+        this.worker.postMessage(msg);
     }
 }
